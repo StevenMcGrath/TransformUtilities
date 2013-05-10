@@ -28,6 +28,8 @@
 		AA7FC7A2173B729800F180C8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA7FC772173B729800F180C8 /* Foundation.framework */; };
 		AA7FC7AA173B729800F180C8 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AA7FC7A8173B729800F180C8 /* InfoPlist.strings */; };
 		AA7FC7AD173B729800F180C8 /* TransformUtilitiesTests.m in Sources */ = {isa = PBXBuildFile; fileRef = AA7FC7AC173B729800F180C8 /* TransformUtilitiesTests.m */; };
+		AA7FC7BA173B73D000F180C8 /* TUTransformUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = AA7FC7B9173B73D000F180C8 /* TUTransformUtilities.m */; };
+		AA7FC7BB173B7A8D00F180C8 /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA7FC776173B729800F180C8 /* GLKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +70,8 @@
 		AA7FC7A9173B729800F180C8 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		AA7FC7AB173B729800F180C8 /* TransformUtilitiesTests.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TransformUtilitiesTests.h; sourceTree = "<group>"; };
 		AA7FC7AC173B729800F180C8 /* TransformUtilitiesTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TransformUtilitiesTests.m; sourceTree = "<group>"; };
+		AA7FC7B8173B73D000F180C8 /* TUTransformUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TUTransformUtilities.h; path = "Utility Classes/TUTransformUtilities.h"; sourceTree = "<group>"; };
+		AA7FC7B9173B73D000F180C8 /* TUTransformUtilities.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TUTransformUtilities.m; path = "Utility Classes/TUTransformUtilities.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,6 +92,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA7FC7A0173B729800F180C8 /* SenTestingKit.framework in Frameworks */,
+				AA7FC7BB173B7A8D00F180C8 /* GLKit.framework in Frameworks */,
 				AA7FC7A1173B729800F180C8 /* UIKit.framework in Frameworks */,
 				AA7FC7A2173B729800F180C8 /* Foundation.framework in Frameworks */,
 			);
@@ -139,6 +144,7 @@
 				AA7FC794173B729800F180C8 /* Shader.vsh */,
 				AA7FC796173B729800F180C8 /* TUViewController.h */,
 				AA7FC797173B729800F180C8 /* TUViewController.m */,
+				AA7FC7B7173B734800F180C8 /* Utility Classes */,
 				AA7FC77B173B729800F180C8 /* Supporting Files */,
 			);
 			path = TransformUtilities;
@@ -175,6 +181,15 @@
 				AA7FC7A8173B729800F180C8 /* InfoPlist.strings */,
 			);
 			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		AA7FC7B7173B734800F180C8 /* Utility Classes */ = {
+			isa = PBXGroup;
+			children = (
+				AA7FC7B8173B73D000F180C8 /* TUTransformUtilities.h */,
+				AA7FC7B9173B73D000F180C8 /* TUTransformUtilities.m */,
+			);
+			name = "Utility Classes";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -294,6 +309,7 @@
 				AA7FC781173B729800F180C8 /* main.m in Sources */,
 				AA7FC785173B729800F180C8 /* TUAppDelegate.m in Sources */,
 				AA7FC798173B729800F180C8 /* TUViewController.m in Sources */,
+				AA7FC7BA173B73D000F180C8 /* TUTransformUtilities.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
