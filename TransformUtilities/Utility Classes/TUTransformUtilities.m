@@ -52,37 +52,33 @@
 
 @implementation TUTransformUtilities
 
-+ (bool)decomposeTransform:(GLKMatrix4)transform intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut translation:(GLKVector3*)translationOut perspective:(GLKVector4*)perspectiveOut;
++ (bool)decomposeProjectionTransform:(GLKMatrix4)transformIn intoPerspective:(GLKVector4*)perspectiveOut residualTransform:(GLKMatrix4*)residualOut;
 {
- 	register int i;
-    GLKVector3 scale, shearRatios, rotation, translation;
+    GLKMatrix4 pmat;
+    int i;
+    GLKMatrix4 tinvpmat;
+    GLKMatrix4 invpmat;
     GLKVector4 perspective;
- 	GLKMatrix4 locmat;
- 	GLKMatrix4 pmat, invpmat, tinvpmat;
  	GLKVector4 prhs;
- 	GLKVector4 column[4];
-
- 	locmat = transform;
- 	
- 	if ( locmat.m33 == 0 )
+    if ( transformIn.m33 == 0 )
  		return false;
  	/* pmat is used to solve for perspective, but it also provides
  	 * an easy way to test for singularity of the upper 3x3 component.
  	 */
- 	pmat = locmat;
+ 	pmat = transformIn;
  	for ( i=0; i<3; i++ )
  		pmat.m[i*4 + 3] = 0;
  	pmat.m33 = 1;
-
+    
  	/* First, isolate perspective. */
- 	if ( locmat.m03 != 0 || locmat.m13 != 0 ||
- 		locmat.m23 != 0 ) {
+ 	if ( transformIn.m03 != 0 || transformIn.m13 != 0 ||
+ 		transformIn.m23 != 0 ) {
  		/* prhs is the right hand side of the equation. */
- 		prhs.x = locmat.m03;
- 		prhs.y = locmat.m13;
- 		prhs.z = locmat.m23;
- 		prhs.w = locmat.m33;
-
+ 		prhs.x = transformIn.m03;
+ 		prhs.y = transformIn.m13;
+ 		prhs.z = transformIn.m23;
+ 		prhs.w = transformIn.m33;
+        
  		/* Solve the equation by inverting pmat and multiplying
  		 * prhs by the inverse.  (This is the easiest way, not
  		 * necessarily the best.)
@@ -114,68 +110,106 @@
         projection.m32 = -1.0 * perspective.w / perspective.z;
         projection.m33 = 0.0;
         //
+        // Convert to inputs to GLKMatrix4MakePerspective
+        //
+        float nearz, farz, q;
+        q = (1 - perspective.z)/(1 + perspective.z);
+        nearz = perspective.w *(1 + q)/2.0;
+        farz = nearz / q;
+//        NSLog(@"Near z = %f, Far z = %f", nearz, farz);
+        //
         // Invert and multiply to remove the projection from the input transform.
         //
         GLKMatrix4 inverseProjection = GLKMatrix4Invert(projection, &invertable);
         if (!invertable) {
             return false;
         }
-        locmat = GLKMatrix4Multiply(inverseProjection, locmat);
+        transformIn = GLKMatrix4Multiply(inverseProjection, transformIn);
         
  		/* Clear the perspective partition. */
-        GLKMatrix4SetRow(locmat, 3, (GLKVector4){0, 0, 0, 1});
+        transformIn = GLKMatrix4SetRow(transformIn, 3, (GLKVector4){0, 0, 0, 1});
         
  	} else	{	/* No perspective. */
  		perspective.x = perspective.y = perspective.z = 0;
         perspective.w = 1; // CSS draft sets w to one here.
     }
+    if (perspectiveOut != nil) *perspectiveOut = perspective;
+    if (residualOut != nil) *residualOut = transformIn;
+    return true;
+}
+
++ (void)factorTransform:(GLKMatrix4)transformIn intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut residualTransform:(GLKMatrix4*)residualOut;
+{
  	/* Now get scale and shear. */
- 	for ( i=0; i<4; i++ ) {
-        column[i] = GLKMatrix4GetColumn(locmat, i);
+    register int i;
+    GLKVector3 scale, shearRatios;
+ 	GLKVector4 column[4];
+    for ( i=0; i<4; i++ ) {
+        column[i] = GLKMatrix4GetColumn(transformIn, i);
  	}
-
-
+    
+    
  	/* Compute X scale factor and normalize first column. */
  	scale.x = GLKVector4Length(column[0]);
  	column[0] = GLKVector4DivideScalar(column[0], scale.x);
-
+    
  	/* Compute XY shear factor and make 2nd column orthogonal to 1st. */
  	shearRatios.x = GLKVector4DotProduct(column[0], column[1]);
  	column[1] = GLKVector4Add(column[1], GLKVector4MultiplyScalar( column[0], -shearRatios.x));
-
+    
  	/* Now, compute Y scale and normalize 2nd column. */
  	scale.y = GLKVector4Length(column[1]);
  	column[1] = GLKVector4DivideScalar(column[1], scale.y);
  	shearRatios.x /= scale.y;
-
+    
  	/* Compute XZ and YZ shears, orthogonalize 3rd column. */
  	shearRatios.y = GLKVector4DotProduct(column[0], column[2]);
  	column[2] = GLKVector4Add(column[2], GLKVector4MultiplyScalar(column[0], -shearRatios.y));
  	shearRatios.z = GLKVector4DotProduct(column[1], column[2]);
  	column[2] = GLKVector4Add(column[2], GLKVector4MultiplyScalar(column[1], -shearRatios.z));
-
+    
  	/* Next, get Z scale and normalize 3rd column. */
  	scale.z = GLKVector4Length(column[2]);
  	column[2] = GLKVector4DivideScalar(column[2], scale.z);
  	shearRatios.y /= scale.z;
  	shearRatios.z /= scale.z;
     
+    if (scaleOut != nil) *scaleOut = scale;
+    if (shearRatiosOut != nil) *shearRatiosOut = shearRatios;
+    if (residualOut != nil) *residualOut = GLKMatrix4MakeWithColumns(column[0], column[1], column[2], column[3]);
+}
+
++ (bool)decomposeModelViewTransform:(GLKMatrix4)transformIn intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut translation:(GLKVector3*)translationOut
+{
+    register int i;
+ 	GLKVector4 column[4];
+    GLKVector3 rotation, translation;
+    
+ 	/* Now get scale and shear. */
+    [self factorTransform:transformIn intoScale:scaleOut shearRatios:shearRatiosOut residualTransform:&transformIn];
+    
+    for ( i=0; i<4; i++ ) {
+        column[i] = GLKMatrix4GetColumn(transformIn, i);
+ 	}
+    
  	/* Next take care of translation. */
     translation = (GLKVector3){column[3].x, column[3].y, column[3].z};
     column[3].x = column[3].y = column[3].z =0;
-        
+    
  	/* At this point, the matrix (in columns[]) is orthonormal.
  	 * Check for a coordinate system flip.  If the determinant
  	 * is -1, then negate the matrix and the scaling factors.
  	 */
  	if ( GLKVector4DotProduct( column[0], GLKVector4CrossProduct( column[1], column[2]) ) < 0 )
  		for ( i = 0; i < 3; i++ ) {
- 			scale.v[i] *= -1;
+            if (scaleOut != nil) {
+                scaleOut->v[i] *= -1;
+            }
  			column[i].x *= -1;
  			column[i].y *= -1;
  			column[i].z *= -1;
  		}
- 
+    
     //
     // Get rotation out as a quaternion
     // What the unmatrix algorithim called rows GLKit calls columns.
@@ -198,13 +232,24 @@
  		rotation.z = 0;
  	}
  	/* All done! */
-    if (scaleOut != nil) *scaleOut = scale;
-    if (shearRatiosOut != nil) *shearRatiosOut = shearRatios;
     if (rotationOut != nil) *rotationOut = rotation;
     if (quaternionOut != nil) *quaternionOut = quaternion;
     if (translationOut != nil) *translationOut = translation;
-    if (perspectiveOut != nil) *perspectiveOut = perspective;
- 	return true;
+    return true;
+}
+
++ (bool)decomposeTransform:(GLKMatrix4)transformIn intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut translation:(GLKVector3*)translationOut perspective:(GLKVector4*)perspectiveOut;
+{
+    GLKVector4 perspective;
+ 	bool result;
+    
+    result = [self decomposeProjectionTransform:transformIn intoPerspective:&perspective residualTransform:&transformIn];
+    
+    if (result) {
+        if (perspectiveOut != nil) *perspectiveOut = perspective;    
+        result = [self decomposeModelViewTransform:transformIn intoScale:scaleOut shearRatios:shearRatiosOut rotation:rotationOut quaternion:quaternionOut translation:translationOut];
+    }
+ 	return result;
 }
 
 @end

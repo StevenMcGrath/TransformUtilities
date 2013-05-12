@@ -54,6 +54,7 @@ static const GLKVector3 unitGLKVector3 = {1.0,1.0,1.0};
 static const GLKVector4 invalidGLKVector4 = {-1.0,-1.0,-1.0,-1.0};
 static const GLKQuaternion invalidGLKQuaternion = {0.0, 0.0, 0.0, 0.0};
 static const float coverage = 0.05; // Fraction of possible tests to run in long running cases.
+static const float selectionThreshold = coverage * RAND_MAX;
 
 - (void)setUp
 {
@@ -408,7 +409,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                         scaleIn.y = (float)m/10.0;
                         for (int n=1; n<=100; n+=20) {
                             scaleIn.z = (float)n/10.0;
-                            if (rand() < coverage *RAND_MAX) {
+                            if (rand() < selectionThreshold) {
                                 bool result = [self coreDecompositionTest];
                                 if (!result) return;
 //                                STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing translation %@ with scale %@", NSStringFromGLKVector3(translationIn), NSStringFromGLKVector3(scaleIn));
@@ -436,7 +437,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                         shearRatiosIn.y = (float)m/10.0;
                         for (int n=1; n<=100; n+=20) {
                             shearRatiosIn.z = (float)n/10.0;
-                            if (rand() < coverage *RAND_MAX) {
+                            if (rand() < selectionThreshold) {
                                 bool result = [self coreDecompositionTest];
                                 if (!result) return;
 //                                STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing translation %@ with shear %@", NSStringFromGLKVector3(translationIn), NSStringFromGLKVector3(shearRatiosIn));
@@ -465,7 +466,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                             rotationAxisIn.y = (float)m;
                             for (int n=-20; n<=20; n+=5) {
                                 rotationAxisIn.z = (float)n;
-                                if (rand() < coverage *RAND_MAX) {
+                                if (rand() < selectionThreshold) {
                                     if ((l!=0)||(m!=0)||(n!=0)) {
                                         bool result = [self coreDecompositionTest];
                                         if (!result) return;
@@ -497,7 +498,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                     for (aspectRatioIn = 0.25; aspectRatioIn <= 4.0; aspectRatioIn *= 2.0) {
                         for (nearClipIn = 5; nearClipIn <= 50; nearClipIn += 5) {
                             for (farClipIn = 100; farClipIn <= 100000; farClipIn *= 10) {
-                                if (rand() < coverage *RAND_MAX) {
+                                if (rand() < selectionThreshold) {
                                     bool result = [self coreDecompositionTest];
                                     if (!result) return;
 //                                    STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing translation %@ with projection with field of view: %f, aspect ratio: %f, near clip: %f, and far clip %f.",NSStringFromGLKVector3(translationIn), fieldOfViewIn, aspectRatioIn, nearClipIn, farClipIn );
@@ -529,7 +530,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                         shearRatiosIn.y = (float)m/10.0;
                         for (int n=-100; n<=100; n+=25) {
                             shearRatiosIn.z = (float)n/10.0;
-                            if (rand() < coverage *RAND_MAX) {
+                            if (rand() < selectionThreshold) {
                                 bool result = [self coreDecompositionTest];
                                 if (!result) return;
 //                                STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing scale %@ and shear ratios %@", NSStringFromGLKVector3(scaleIn), NSStringFromGLKVector3(shearRatiosIn));
@@ -558,7 +559,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                             rotationAxisIn.y = (float)m;
                             for (int n=-20; n<=20; n+=5) {
                                 rotationAxisIn.z = (float)n;
-                                if (rand() < coverage *RAND_MAX) {
+                                if (rand() < selectionThreshold) {
                                     if ((l!=0)||(m!=0)||(n!=0)) {
                                         bool result = [self coreDecompositionTest];
                                         if (!result) return;
@@ -588,7 +589,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                     for (aspectRatioIn = 0.25; aspectRatioIn <= 4.0; aspectRatioIn *= 2.0) {
                         for (nearClipIn = 5; nearClipIn <= 50; nearClipIn += 5) {
                             for (farClipIn = 100; farClipIn <= 100000; farClipIn *= 10) {
-                                if (rand() < coverage *RAND_MAX) {
+                                if (rand() < selectionThreshold) {
                                     bool result = [self coreDecompositionTest];
                                     if (!result) return;
 //                                    STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing scale %@ with projection with field of view: %f, aspect ratio: %f, near clip: %f, and far clip %f.",NSStringFromGLKVector3(scaleIn), fieldOfViewIn, aspectRatioIn, nearClipIn, farClipIn );
@@ -619,7 +620,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                             rotationAxisIn.y = (float)m;
                             for (int n=-20; n<=20; n+=5) {
                                 rotationAxisIn.z = (float)n;
-                                if (rand() < coverage *RAND_MAX) {
+                                if (rand() < selectionThreshold) {
                                     if ((l!=0)||(m!=0)||(n!=0)) {
                                         bool result = [self coreDecompositionTest];
                                         if (!result) return;
@@ -651,7 +652,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                     for (aspectRatioIn = 0.25; aspectRatioIn <= 4.0; aspectRatioIn *= 2.0) {
                         for (nearClipIn = 5; nearClipIn <= 50; nearClipIn += 5) {
                             for (farClipIn = 100; farClipIn <= 100000; farClipIn *= 10) {
-                                if (rand() < coverage *RAND_MAX) {
+                                if (rand() < selectionThreshold) {
                                     bool result = [self coreDecompositionTest];
                                     if (!result) return;
 //                                    STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing shear ratios %@ with projection with field of view: %f, aspect ratio: %f, near clip: %f, and far clip %f.",NSStringFromGLKVector3(shearRatiosIn), fieldOfViewIn, aspectRatioIn, nearClipIn, farClipIn );
@@ -684,7 +685,7 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
                             for (aspectRatioIn = 0.25; aspectRatioIn <= 4.0; aspectRatioIn *= 2.0) {
                                 for (nearClipIn = 5; nearClipIn <= 50; nearClipIn +=10) {
                                     for (farClipIn = 150; farClipIn <= 100000; farClipIn *= 20) {
-                                        if (rand() < coverage *RAND_MAX) {
+                                        if (rand() < selectionThreshold) {
                                             bool result = [self coreDecompositionTest];
                                             if (!result) return;
 //                                            STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing rotation around axis %@ with angle %f with projection with field of view: %f, aspect ratio: %f, near clip: %f, and far clip %f.",NSStringFromGLKVector3(rotationAxisIn), rotationAngleIn, fieldOfViewIn, aspectRatioIn, nearClipIn, farClipIn );
@@ -705,17 +706,17 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
 
 - (void)testMatrixDecomposition
 {
-//    translationIn = (GLKVector3){0.0, 0.0, 100.0};
-    shearRatiosIn = (GLKVector3){0.5, 0.0, 0.0};
+    translationIn = (GLKVector3){0.0, 0.0, 100.0};
+//    shearRatiosIn = (GLKVector3){0.5, 0.0, 0.0};
 //    rotationAngleIn = M_PI_2/2.0;
 //    rotationAxisIn = (GLKVector3){1.0, 1.0, 0.0};
-    scaleIn = (GLKVector3){1.0, 2.0, 1.0};
+//    scaleIn = (GLKVector3){1.0, 2.0, 1.0};
 //    fieldOfVewIn = GLKMathDegreesToRadians(35.0f);
 //    aspectRatioIn = 1.0;
 //    nearClipIn = 50.0f;
 //    farClipIn = 1000.0f;   //(M_PI_2, 1.0, 10.0, 10000.0);
 //
-//    frustrumBoundsIn = (GLKVector4){-4.0, 16.0, -10.0, 10.0};
+    frustrumBoundsIn = (GLKVector4){-4.0, 16.0, -5.0, 25.0};
 //    fieldOfViewIn = GLKMathDegreesToRadians(90.0f);
 //    aspectRatioIn = 1.0;
     nearClipIn = 10.0f;
@@ -723,15 +724,9 @@ static const float coverage = 0.05; // Fraction of possible tests to run in long
 //    eyeIn = (GLKVector3){0.0, 0.0, 1.0};
 //    centerIn = (GLKVector3){0.0, 0.0, 0.0};
 //    upIn = (GLKVector3){0.0, 1.0, 0.0};
-    bool result = [self coreDecompositionTest];
-    STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular.");
-    if (result) {
-        [self composeOutputMatrix];
-        NSLog(@"Input projection:  %@", NSStringFromGLKMatrix4(projectionIn));
-        NSLog(@"Input transform:   %@", NSStringFromGLKMatrix4(transformIn));
-        NSLog(@"Output projection: %@", NSStringFromGLKMatrix4(projectionOut));
-        NSLog(@"Output transform:  %@", NSStringFromGLKMatrix4(transformOut));
-    }
+//    bool result =
+    [self coreDecompositionTest];
+//    STAssertTrue(result, @"false returned from coreDecompositionTest.");
 }
 
 @end
