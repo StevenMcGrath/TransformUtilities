@@ -35,12 +35,13 @@
     // Declare inputs.
     GLKVector3 scaleIn, shearRatiosIn, rotationAxisIn, translationIn;
     GLKVector3 eyeIn, centerIn, upIn;
-    GLKVector4 frustrumBoundsIn;
+    GLKVector4 frustumBoundsIn;
     float rotationAngleIn, fieldOfViewIn, aspectRatioIn, nearClipIn, farClipIn;
     GLKMatrix4 transformIn; // Computed from other input componenets as input for decomposition
     GLKMatrix4 projectionIn, projectionOut;
     // Declare vectors to receive results.
     GLKVector3 scaleOut, shearRatiosOut, rotationOut, translationOut;
+    GLKVector3 frustumLowerBoundsOut, frustumUpperBoundsOut;
     GLKQuaternion quaternionIn, quaternionOut;
     GLKVector4 perspectiveOut;
     GLKMatrix4 transformOut;    // Reconstructed from outputs for comparison to input.
@@ -67,7 +68,7 @@ static const float selectionThreshold = coverage * RAND_MAX;
     // Initialize test inputs.
     //
     scaleIn = shearRatiosIn = rotationAxisIn = translationIn = eyeIn = centerIn = upIn =invalidGLKVector3;
-    frustrumBoundsIn = invalidGLKVector4;
+    frustumBoundsIn = invalidGLKVector4;
     rotationAngleIn = fieldOfViewIn = aspectRatioIn = nearClipIn = farClipIn = 0.0;
     quaternionIn = invalidGLKQuaternion;
     //
@@ -80,6 +81,8 @@ static const float selectionThreshold = coverage * RAND_MAX;
     scaleOut = shearRatiosOut = rotationOut = translationOut = invalidGLKVector3;
     quaternionOut = invalidGLKQuaternion;
     perspectiveOut = invalidGLKVector4;
+    frustumLowerBoundsOut = frustumUpperBoundsOut = invalidGLKVector3;
+    projectionOut = GLKMatrix4Identity;
     transformOut = GLKMatrix4Identity;
     //
     // Reset bypass flags
@@ -109,7 +112,12 @@ static const float selectionThreshold = coverage * RAND_MAX;
     bool result = false;
     [self composeInputTranform];
     float errorSize;
-    result = [TUTransformUtilities decomposeTransform:transformIn intoScale:&scaleOut  shearRatios:&shearRatiosOut rotation:&rotationOut quaternion:&quaternionOut translation:&translationOut perspective:&perspectiveOut];
+    if (!GLKVector4AllEqualToVector4(frustumBoundsIn, invalidGLKVector4)) {
+        result = [TUTransformUtilities decomposeTransform:transformIn intoScale:&scaleOut  shearRatios:&shearRatiosOut rotation:&rotationOut quaternion:&quaternionOut translation:&translationOut frustum:&frustumLowerBoundsOut :&frustumUpperBoundsOut];
+    }
+    else {
+        result = [TUTransformUtilities decomposeTransform:transformIn intoScale:&scaleOut  shearRatios:&shearRatiosOut rotation:&rotationOut quaternion:&quaternionOut translation:&translationOut perspective:&perspectiveOut];
+    }
     if (result) {
         GLKVector3 delta;
         if (!bypassTranslationCheck) {
@@ -179,9 +187,9 @@ static const float selectionThreshold = coverage * RAND_MAX;
     }
     if (!GLKVector3AllEqualToVector3(shearRatiosIn, invalidGLKVector3)) {
         GLKMatrix4 shearMatrix = GLKMatrix4Identity;
-        shearMatrix.m21 = shearRatiosIn.z;  //YZ shear
-        shearMatrix.m20 = shearRatiosIn.y;  //XZ shear
-        shearMatrix.m10 = shearRatiosIn.x;  //XY shear
+        shearMatrix.m21 = shearRatiosIn.v[2];  //YZ shear
+        shearMatrix.m20 = shearRatiosIn.v[1];  //XZ shear
+        shearMatrix.m10 = shearRatiosIn.v[0];  //XY shear
         transformIn = GLKMatrix4Multiply(transformIn, shearMatrix);
     }
     if (!GLKVector3AllEqualToVector3(scaleIn, invalidGLKVector3)) {
@@ -199,8 +207,8 @@ static const float selectionThreshold = coverage * RAND_MAX;
     if (fieldOfViewIn != 0.0) {
         projectionIn = GLKMatrix4MakePerspective(fieldOfViewIn, aspectRatioIn, nearClipIn, farClipIn);
     }
-    else if (!GLKVector4AllEqualToVector4(frustrumBoundsIn, invalidGLKVector4)) {
-        projectionIn = GLKMatrix4MakeFrustum(frustrumBoundsIn.x, frustrumBoundsIn.y, frustrumBoundsIn.z, frustrumBoundsIn.w, nearClipIn, farClipIn);
+    else if (!GLKVector4AllEqualToVector4(frustumBoundsIn, invalidGLKVector4)) {
+        projectionIn = GLKMatrix4MakeFrustum(frustumBoundsIn.x, frustumBoundsIn.y, frustumBoundsIn.z, frustumBoundsIn.w, nearClipIn, farClipIn);
     }
     else {
         projectionIn = GLKMatrix4Identity;
@@ -240,23 +248,29 @@ static const float selectionThreshold = coverage * RAND_MAX;
     transformOut = GLKMatrix4RotateX(transformOut, rotationOut.x);
     */
     GLKMatrix4 shearMatrix = GLKMatrix4Identity;
-    shearMatrix.m21 = shearRatiosOut.z;  //YZ shear
-    shearMatrix.m20 = shearRatiosOut.y;  //XZ shear
-    shearMatrix.m10 = shearRatiosOut.x;  //XY shear
+    shearMatrix.m21 = shearRatiosOut.v[2];  //YZ shear
+    shearMatrix.m20 = shearRatiosOut.v[1];  //XZ shear
+    shearMatrix.m10 = shearRatiosOut.v[0];  //XY shear
     transformOut = GLKMatrix4Multiply(transformOut, shearMatrix);
     transformOut = GLKMatrix4ScaleWithVector3(transformOut, scaleOut);
     // Compose the projection matrix representing the perspective output.
-//    NSLog(@"perspective = %f, %f, %f, %f", perspectiveOut.x, perspectiveOut.y, perspectiveOut.z,perspectiveOut.w);
-    projectionOut = GLKMatrix4Identity;
-    projectionOut.m03 = perspectiveOut.x;
-    projectionOut.m13 = perspectiveOut.y;
-    // Adjust the z scaling to match output of GLKMatrix4MakeFrustrum and GLKMatrix4MakePerspective
-    if (perspectiveOut.z != 0.0) {
-        projectionOut.m22 = -1.0/perspectiveOut.z;
-        projectionOut.m23 = -1.0;
-        projectionOut.m32 = -1.0 * perspectiveOut.w / perspectiveOut.z;
-        projectionOut.m33 = 0.0;
+    if (fieldOfViewIn > 0) {
+        projectionOut = GLKMatrix4MakePerspective(perspectiveOut.x, perspectiveOut.y, perspectiveOut.z, perspectiveOut.w);
     }
+    else if (!(GLKVector3AllEqualToVector3(frustumLowerBoundsOut, invalidGLKVector3) || GLKVector3AllEqualToVector3(frustumUpperBoundsOut, invalidGLKVector3))) {
+        projectionOut = GLKMatrix4MakeFrustum(frustumLowerBoundsOut.x, frustumUpperBoundsOut.x, frustumLowerBoundsOut.y, frustumUpperBoundsOut.y, frustumLowerBoundsOut.z, frustumUpperBoundsOut.z);
+    }
+//    NSLog(@"perspective = %f, %f, %f, %f", perspectiveOut.x, perspectiveOut.y, perspectiveOut.z,perspectiveOut.w);
+//    projectionOut = GLKMatrix4Identity;
+//    projectionOut.m03 = perspectiveOut.x;
+//    projectionOut.m13 = perspectiveOut.y;
+//    // Adjust the z scaling to match output of GLKMatrix4MakeFrustum and GLKMatrix4MakePerspective
+//    if (perspectiveOut.z != 0.0) {
+//        projectionOut.m22 = -1.0/perspectiveOut.z;
+//        projectionOut.m23 = -1.0;
+//        projectionOut.m32 = -1.0 * perspectiveOut.w / perspectiveOut.z;
+//        projectionOut.m33 = 0.0;
+//    }
     transformOut = GLKMatrix4Multiply(projectionOut, transformOut);
     
 }
@@ -281,13 +295,30 @@ static const float selectionThreshold = coverage * RAND_MAX;
 
 - (void) logTestConditions {
     NSString *logString = @"\n\nInputs:";
-    logString = [logString stringByAppendingFormat:@"\nPerspective inputs - FOV: %f, apsect ratio: %f, near clip: %f, far clip: %f.", fieldOfViewIn, aspectRatioIn, nearClipIn, farClipIn];
+    if (fieldOfViewIn > 0) {
+        logString = [logString stringByAppendingFormat:@"\nPerspective inputs - \nFOV: %f (%f degrees), apsect ratio: %f, near clip: %f, far clip: %f.", fieldOfViewIn, GLKMathRadiansToDegrees(fieldOfViewIn), aspectRatioIn, nearClipIn, farClipIn];
+    }
+    if (!GLKVector4AllEqualToVector4(frustumBoundsIn, invalidGLKVector4)) {
+        logString = [logString stringByAppendingFormat:@"\nFrustum inputs - Min x: %f, Max x: %f, Min y: %f, Max y: %f, near clip: %f, far clip: %f.", frustumBoundsIn.x, frustumBoundsIn.y, frustumBoundsIn.z, frustumBoundsIn.w, nearClipIn, farClipIn];
+    }
     logString = [logString stringByAppendingFormat:@"\nQuaternion for input rotation = %@", NSStringFromGLKQuaternion(quaternionIn)];
-    logString = [logString stringByAppendingFormat:@"\nscale = %f, %f, %f", scaleIn.x, scaleIn.y, scaleIn.z];
-    logString = [logString stringByAppendingFormat:@"\ntranslation = %f, %f, %f", translationIn.x, translationIn.y, translationIn.z];
+    if (!GLKVector3AllEqualToVector3(shearRatiosIn, invalidGLKVector3)) {
+        logString = [logString stringByAppendingFormat:@"\nshear = %f, %f, %f", shearRatiosIn.v[0], shearRatiosIn.v[1], shearRatiosIn.v[2]];
+    }
+    if (!GLKVector3AllEqualToVector3(scaleIn, invalidGLKVector3)) {
+        logString = [logString stringByAppendingFormat:@"\nscale = %f, %f, %f", scaleIn.x, scaleIn.y, scaleIn.z];
+    }
+    if (!GLKVector3AllEqualToVector3(translationIn, invalidGLKVector3)) {
+        logString = [logString stringByAppendingFormat:@"\ntranslation = %f, %f, %f", translationIn.x, translationIn.y, translationIn.z];
+    }
     logString = [logString stringByAppendingFormat:@"\n\nOutputs:"];
-    logString = [logString stringByAppendingFormat:@"\nperspective = %f, %f, %f, %f", perspectiveOut.x, perspectiveOut.y, perspectiveOut.z,perspectiveOut.w];
-    logString = [logString stringByAppendingFormat:@"\nshearRatios = %f, %f, %f", shearRatiosOut.x, shearRatiosOut.y, shearRatiosOut.z];
+    if (!GLKVector4AllEqualToVector4(perspectiveOut, invalidGLKVector4)) {
+        logString = [logString stringByAppendingFormat:@"\nperspective = %f (%F degrees), %f, %f, %f", perspectiveOut.x, GLKMathRadiansToDegrees(perspectiveOut.x), perspectiveOut.y, perspectiveOut.z,perspectiveOut.w];
+    }
+    if (!(GLKVector3AllEqualToVector3(frustumLowerBoundsOut, invalidGLKVector3) || GLKVector3AllEqualToVector3(frustumUpperBoundsOut, invalidGLKVector3))) {
+        logString = [logString stringByAppendingFormat:@"\nfrustum bounds = %@, %@", NSStringFromGLKVector3(frustumLowerBoundsOut), NSStringFromGLKVector3(frustumUpperBoundsOut)];
+    }
+    logString = [logString stringByAppendingFormat:@"\nshearRatios = %f, %f, %f", shearRatiosOut.v[0], shearRatiosOut.v[1], shearRatiosOut.v[2]];
     logString = [logString stringByAppendingFormat:@"\nscale = %f, %f, %f", scaleOut.x, scaleOut.y, scaleOut.z];
     logString = [logString stringByAppendingFormat:@"\ntranslation = %f, %f, %f", translationOut.x, translationOut.y, translationOut.z];
     logString = [logString stringByAppendingFormat:@"\nquaternion = %@", NSStringFromGLKQuaternion(quaternionOut)];
@@ -339,11 +370,11 @@ static const float selectionThreshold = coverage * RAND_MAX;
 - (void)testShearDecomposition
 {
     for (int i=-100; i<=100; i+=5) {
-        shearRatiosIn.x = (float)i/10.0;
+        shearRatiosIn.v[0] = (float)i/10.0;
         for (int j=-100; j<=100; j+=5) {
-            shearRatiosIn.y = (float)j/10.0;
+            shearRatiosIn.v[1] = (float)j/10.0;
             for (int k=-100; k<=100; k+=5) {
-                shearRatiosIn.z = (float)k/10.0;
+                shearRatiosIn.v[2] = (float)k/10.0;
                 bool result = [self coreDecompositionTest];
                 if (!result) return;
 //                STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing hear ratios %@", NSStringFromGLKVector3(shearRatiosIn));
@@ -376,7 +407,6 @@ static const float selectionThreshold = coverage * RAND_MAX;
 - (void)testProjectionDecomposition
 {
     translationIn = (GLKVector3){0.0, 0.0, 100.0};  // A non-zero translation is required for perspective.
-    bypassScaleCheck = true;    // Projection and scale changes cannot be disambiguated.
     for (fieldOfViewIn = M_PI/18.0; fieldOfViewIn <= (17.0/18.0) * M_PI; fieldOfViewIn += M_PI/18.0) {
         for (aspectRatioIn = 0.25; aspectRatioIn <= 4.0; aspectRatioIn *= 2.0) {
             for (nearClipIn = 5; nearClipIn <= 50; nearClipIn += 5) {
@@ -388,7 +418,25 @@ static const float selectionThreshold = coverage * RAND_MAX;
             }
         }
     }
-    bypassScaleCheck = false;
+}
+
+- (void)testFrustumDecomposition
+{
+    for (frustumBoundsIn.v[0] = -40.0; frustumBoundsIn.v[0] < 0.0; frustumBoundsIn.v[0] += 5.0) {
+        for (frustumBoundsIn.v[1] = 5.0; frustumBoundsIn.v[1] <= 40.0; frustumBoundsIn.v[1] += 5.0) {
+            for (frustumBoundsIn.v[2] = -40.0; frustumBoundsIn.v[2] < 0.0; frustumBoundsIn.v[2] += 5.0) {
+                for (frustumBoundsIn.v[3] = 5.0; frustumBoundsIn.v[3] <= 40.0; frustumBoundsIn.v[3] += 5.0) {
+                    for (nearClipIn = 5; nearClipIn <= 50; nearClipIn += 5) {
+                        for (farClipIn = 100; farClipIn <= 100000; farClipIn *= 10) {
+                            bool result = [self coreDecompositionTest];
+                            if (!result) return;
+                            //                    STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing frustum" );
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #pragma mark - Level 2 tests
@@ -432,11 +480,11 @@ static const float selectionThreshold = coverage * RAND_MAX;
             for (int k=-100; k<=100; k+=20) {
                 translationIn.z = (float)k;
                 for (int l=1; l<=100; l+=20) {
-                    shearRatiosIn.x = (float)l/10.0;
+                    shearRatiosIn.v[0] = (float)l/10.0;
                     for (int m=1; m<=100; m+=20) {
-                        shearRatiosIn.y = (float)m/10.0;
+                        shearRatiosIn.v[1] = (float)m/10.0;
                         for (int n=1; n<=100; n+=20) {
-                            shearRatiosIn.z = (float)n/10.0;
+                            shearRatiosIn.v[2] = (float)n/10.0;
                             if (rand() < selectionThreshold) {
                                 bool result = [self coreDecompositionTest];
                                 if (!result) return;
@@ -484,9 +532,6 @@ static const float selectionThreshold = coverage * RAND_MAX;
 
 - (void)testTranslationAndProjectionDecomposition
 {
-    bypassScaleCheck = true;    // Projection and scale changes cannot be disambiguated?
-    bypassTranslationCheck = true;
-    bypassShearCheck = true;
     expectedAccuracy = 5.0e-4;
     for (int i=-100; i<=100; i+=25) {
         translationIn.x = (float)i;
@@ -510,9 +555,6 @@ static const float selectionThreshold = coverage * RAND_MAX;
             }
         }
     }
-    bypassScaleCheck = false;
-    bypassTranslationCheck = false;
-    bypassShearCheck = false;
 }
 
 // Scale must be non-zero, and negative scales may be confounded with rotations
@@ -525,11 +567,11 @@ static const float selectionThreshold = coverage * RAND_MAX;
             for (int k=1; k<=100; k+=25) {
                 scaleIn.z = (float)k/10.0;
                 for (int l=-100; l<=100; l+=25) {
-                    shearRatiosIn.x = (float)l/10.0;
+                    shearRatiosIn.v[0] = (float)l/10.0;
                     for (int m=-100; m<=100; m+=25) {
-                        shearRatiosIn.y = (float)m/10.0;
+                        shearRatiosIn.v[1] = (float)m/10.0;
                         for (int n=-100; n<=100; n+=25) {
-                            shearRatiosIn.z = (float)n/10.0;
+                            shearRatiosIn.v[2] = (float)n/10.0;
                             if (rand() < selectionThreshold) {
                                 bool result = [self coreDecompositionTest];
                                 if (!result) return;
@@ -608,11 +650,11 @@ static const float selectionThreshold = coverage * RAND_MAX;
 {
     expectedAccuracy = 5.0e-4;
     for (int i=-100; i<=100; i+=25) {
-        shearRatiosIn.x = (float)i/10.0;
+        shearRatiosIn.v[0] = (float)i/10.0;
         for (int j=-100; j<=100; j+=25) {
-            shearRatiosIn.y = (float)j/10.0;
+            shearRatiosIn.v[1] = (float)j/10.0;
             for (int k=-100; k<=100; k+=25) {
-                shearRatiosIn.z = (float)k/10.0;
+                shearRatiosIn.v[2] = (float)k/10.0;
                 for (rotationAngleIn = -M_PI; rotationAngleIn <= M_PI; rotationAngleIn += M_PI/18.0) { // Ten degree increments
                     for (int l=-20; l<=20; l+=5) {
                         rotationAxisIn.x = (float)l;
@@ -640,14 +682,12 @@ static const float selectionThreshold = coverage * RAND_MAX;
 {
     expectedAccuracy = 0.1;  //   Much lower numeric stability on device!
     translationIn = (GLKVector3){0.0, 0.0, 100.0};  // A non-zero translation is required for perspective.
-    bypassScaleCheck = true;    // Projection and scale changes cannot be disambiguated.
-    bypassShearCheck = true;
     for (int i=-100; i<=100; i+=10) {
-        shearRatiosIn.x = (float)i/10.0;
+        shearRatiosIn.v[0] = (float)i/10.0;
         for (int j=-100; j<=100; j+=10) {
-            shearRatiosIn.y = (float)j/10.0;
+            shearRatiosIn.v[1] = (float)j/10.0;
             for (int k=-100; k<=100; k+=10) {
-                shearRatiosIn.z = (float)k/10.0;
+                shearRatiosIn.v[2] = (float)k/10.0;
                 for (fieldOfViewIn = M_PI/18.0; fieldOfViewIn <= (17.0/18.0) * M_PI; fieldOfViewIn += M_PI/18.0) {
                     for (aspectRatioIn = 0.25; aspectRatioIn <= 4.0; aspectRatioIn *= 2.0) {
                         for (nearClipIn = 5; nearClipIn <= 50; nearClipIn += 5) {
@@ -664,15 +704,12 @@ static const float selectionThreshold = coverage * RAND_MAX;
             }
         }
     }
-    bypassScaleCheck = false;
 }
 
 - (void)testRotationAndProjectionDecomposition
 {
-    expectedAccuracy = 5.0e-4;
-    bypassShearCheck = true;
+    expectedAccuracy = 5.0e-3;
     translationIn = (GLKVector3){0.0, 0.0, 100.0};  // A non-zero translation is required for perspective.
-    bypassScaleCheck = true;    // Projection and scale changes cannot be disambiguated.
     for (rotationAngleIn = -M_PI; rotationAngleIn <= M_PI; rotationAngleIn += M_PI/18.0) { // Ten degree increments
         for (int i=-20; i<=20; i+=5) {
             rotationAxisIn.x = (float)i;
@@ -699,33 +736,113 @@ static const float selectionThreshold = coverage * RAND_MAX;
             }
         }
     }
-    bypassScaleCheck = false;
+}
+
+- (void)testRotationAndFrustumDecomposition
+{
+    expectedAccuracy = 5.0e-3;
+    for (rotationAngleIn = -M_PI; rotationAngleIn <= M_PI; rotationAngleIn += M_PI/18.0) { // Ten degree increments
+        for (int i=-20; i<=20; i+=5) {
+            rotationAxisIn.x = (float)i;
+            for (int j=-20; j<=20; j+=5) {
+                rotationAxisIn.y = (float)j;
+                for (int k=-20; k<=20; k+=5) {
+                    rotationAxisIn.z = (float)k;
+                    if ((i!=0)||(j!=0)||(j!=0)) {
+                        for (frustumBoundsIn.v[0] = -40.0; frustumBoundsIn.v[0] < 0.0; frustumBoundsIn.v[0] += 5.0) {
+                            for (frustumBoundsIn.v[1] = 5.0; frustumBoundsIn.v[1] <= 40.0; frustumBoundsIn.v[1] += 5.0) {
+                                for (frustumBoundsIn.v[2] = -40.0; frustumBoundsIn.v[2] < 0.0; frustumBoundsIn.v[2] += 5.0) {
+                                    for (frustumBoundsIn.v[3] = 5.0; frustumBoundsIn.v[3] <= 40.0; frustumBoundsIn.v[3] += 5.0) {
+                                        for (nearClipIn = 5; nearClipIn <= 50; nearClipIn +=10) {
+                                            for (farClipIn = 150; farClipIn <= 100000; farClipIn *= 20) {
+                                                if (rand() < selectionThreshold) {
+                                                    bool result = [self coreDecompositionTest];
+                                                    if (!result) return;
+                                                    //                                            STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing rotation and frustum );
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#pragma mark - Level 3 tests
+//
+// Tests of resolution of trios of transform types
+
+- (void)testScaleShearAndRotationDecomposition
+{
+    expectedAccuracy = 5.0e-3;
+    for (int i=1; i<=100; i+=25) {
+        scaleIn.x = (float)i/10.0;
+        for (int j=1; j<=100; j+=25) {
+            scaleIn.y = (float)j/10.0;
+            for (int k=1; k<=100; k+=25) {
+                scaleIn.z = (float)k/10.0;
+                for (int l=-100; l<=100; l+=25) {
+                    shearRatiosIn.v[0] = (float)l/10.0;
+                    for (int m=-100; m<=100; m+=25) {
+                        shearRatiosIn.v[1] = (float)m/10.0;
+                        for (int n=-100; n<=100; n+=25) {
+                            shearRatiosIn.v[2] = (float)n/10.0;
+                            for (rotationAngleIn = -M_PI; rotationAngleIn <= M_PI; rotationAngleIn += M_PI/18.0) { // Ten degree increments
+                                for (int o=-20; o<=20; o+=5) {
+                                    rotationAxisIn.x = (float)o;
+                                    for (int p=-20; p<=20; p+=5) {
+                                        rotationAxisIn.y = (float)p;
+                                        for (int q=-20; q<=20; q+=5) {
+                                            rotationAxisIn.z = (float)q;
+                                            if (rand() < selectionThreshold) {
+                                                if ((o!=0)||(p!=0)||(q!=0)) {
+                                                    bool result = [self coreDecompositionTest];
+                                                    if (!result) return;
+                                                    //                                        STAssertTrue(result, @"false returned from coreDecompositionTest, indicating decomposeTransform saw input transform as singular while testing scale %@ with rotation around axis %@ with angle %f", NSStringFromGLKVector3(scaleIn), NSStringFromGLKVector3(rotationAxisIn), rotationAngleIn);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #pragma mark - Debug tests
 
 - (void)testMatrixDecomposition
 {
-    translationIn = (GLKVector3){0.0, 0.0, 100.0};
-//    shearRatiosIn = (GLKVector3){0.5, 0.0, 0.0};
-//    rotationAngleIn = M_PI_2/2.0;
-//    rotationAxisIn = (GLKVector3){1.0, 1.0, 0.0};
-//    scaleIn = (GLKVector3){1.0, 2.0, 1.0};
+    translationIn = (GLKVector3){30.0, 40.0, 100.0};
+//    shearRatiosIn = (GLKVector3){2, -0.6, 0.7};
+    rotationAngleIn = M_PI_2/2.0;
+    rotationAxisIn = (GLKVector3){1.0, 1.0, 1.0};
+//    scaleIn = (GLKVector3){3.0, 2.0, 1.0};
 //    fieldOfVewIn = GLKMathDegreesToRadians(35.0f);
 //    aspectRatioIn = 1.0;
 //    nearClipIn = 50.0f;
 //    farClipIn = 1000.0f;   //(M_PI_2, 1.0, 10.0, 10000.0);
-//
-    frustrumBoundsIn = (GLKVector4){-4.0, 16.0, -5.0, 25.0};
+
+    frustumBoundsIn = (GLKVector4){-16.0, 4.0, -5.0, 15.0};
+//    frustumBoundsIn = (GLKVector4){-4.0, 16.0, -5.0, 25.0};
 //    fieldOfViewIn = GLKMathDegreesToRadians(90.0f);
-//    aspectRatioIn = 1.0;
+//    aspectRatioIn = 2.0;
     nearClipIn = 10.0f;
     farClipIn = 100.0f;
 //    eyeIn = (GLKVector3){0.0, 0.0, 1.0};
 //    centerIn = (GLKVector3){0.0, 0.0, 0.0};
 //    upIn = (GLKVector3){0.0, 1.0, 0.0};
-//    bool result =
-    [self coreDecompositionTest];
+    bool result = [self coreDecompositionTest];
+    if (result) [self logTestConditions];
 //    STAssertTrue(result, @"false returned from coreDecompositionTest.");
 }
 

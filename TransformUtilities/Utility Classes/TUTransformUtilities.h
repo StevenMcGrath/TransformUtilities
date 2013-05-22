@@ -59,6 +59,8 @@
  *
  * Returns true upon success, false if the matrix is singular.
  */
-+ (bool)decomposeTransform:(GLKMatrix4)transform intoScale:(GLKVector3*)scale  shearRatios:(GLKVector3*)shearRatios rotation:(GLKVector3*)rotation quaternion:(GLKQuaternion*)quaternion translation:(GLKVector3*)translation perspective:(GLKVector4*)perspective;
++ (bool)decomposeTransform:(GLKMatrix4)transformIn intoScale:(GLKVector3*)scaleOut  shearRatios:(GLKVector3*)shearRatiosOut rotation:(GLKVector3*)rotationOut quaternion:(GLKQuaternion*)quaternionOut translation:(GLKVector3*)translationOut perspective:(GLKVector4*)perspectiveOut;
+
++ (bool)decomposeTransform:(GLKMatrix4)transformIn intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut translation:(GLKVector3*)translationOut frustum:(GLKVector3*)lowerBoundsOut :(GLKVector3*)upperBoundsOut;
 
 @end
