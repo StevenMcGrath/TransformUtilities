@@ -31,6 +31,15 @@
 #import <GLKit/GLKit.h>
 #import "TUTransformUtilities.h"
 
+// In order to get broad coverage of possible inputs, some of the test cases below involve deeply nested loops, which would
+// require extensive time to complete if executed in full. To reduce the load while still getting broad coverage, a 
+// pseudo random selection, based on a fixed seed for reproducability, is used to pick a small subset of the possible cases
+// to run.  The 'coverage' value can be set to the desired fraction.
+//
+// A maximum error value is output from each test to provide an approximation of the numerical stability of each type of use,
+// and is of particular interest since this is a single precision package.  However, the exact significance of this value
+// depends on the intended use and the parameters of the test.
+
 @implementation TransformUtilitiesTests {
     // Declare inputs.
     GLKVector3 scaleIn, shearRatiosIn, rotationAxisIn, translationIn;
@@ -113,10 +122,10 @@ static const float selectionThreshold = coverage * RAND_MAX;
     [self composeInputTranform];
     float errorSize;
     if (!GLKVector4AllEqualToVector4(frustumBoundsIn, invalidGLKVector4)) {
-        result = [TUTransformUtilities decomposeTransform:transformIn intoScale:&scaleOut  shearRatios:&shearRatiosOut rotation:&rotationOut quaternion:&quaternionOut translation:&translationOut frustum:&frustumLowerBoundsOut :&frustumUpperBoundsOut];
+        result = [TUTransformUtilities decomposeTransform:transformIn frustum:&frustumLowerBoundsOut :&frustumUpperBoundsOut translation:&translationOut rotation:&rotationOut quaternion:&quaternionOut shearRatios:&shearRatiosOut scale:&scaleOut];
     }
     else {
-        result = [TUTransformUtilities decomposeTransform:transformIn intoScale:&scaleOut  shearRatios:&shearRatiosOut rotation:&rotationOut quaternion:&quaternionOut translation:&translationOut perspective:&perspectiveOut];
+        result = [TUTransformUtilities decomposeTransform:transformIn perspective:&perspectiveOut translation:&translationOut rotation:&rotationOut quaternion:&quaternionOut shearRatios:&shearRatiosOut scale:&scaleOut];
     }
     if (result) {
         GLKVector3 delta;

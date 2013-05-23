@@ -41,18 +41,15 @@
 #include <math.h>
 #include "TUTransformUtilities.h"
 
-/* decomposeTransform is based on unmatrix:
+/* The decomposeTransform approach is based on unmatrix:
  *
- * unmatrix - Decompose a non-degenerate 4x4 transformation matrix into
- * 	the sequence of transformations that produced it.
- * [Sx][Sy][Sz][Shearx/y][Sx/z][Sz/y][Rx][Ry][Rz][Tx][Ty][Tz][P(x,y,z,w)]
+ * Return true upon success, false if the matrix is singular.
  *
- * Returns true upon success, false if the matrix is singular.
  */
 
 @implementation TUTransformUtilities
 
-+ (bool)getRawPerspective:(GLKVector4*)perspectiveOut fromTransform:(GLKMatrix4)transformIn;
++ (bool)getRawPerspective:(GLKVector4*)perspectiveOut fromTransform:(GLKMatrix4)transformIn
 {
     GLKMatrix4 pmat;
     int i;
@@ -96,7 +93,20 @@
     return true;
 }
 
-+ (bool)decomposeProjectionTransform:(GLKMatrix4)transformIn intoPerspective:(GLKVector4*)perspectiveOut residualTransform:(GLKMatrix4*)residualOut;
++ (bool)decomposeProjectionTransform:(GLKMatrix4)transformIn intoPerspective:(GLKVector4*)perspectiveOut residualTransform:(GLKMatrix4*)residualOut
+//
+// Isolates the elements that comprise a projection matrix as produced by GLKMatrix4MakePerspective, returning those elements,
+// field of view, aspect ratio, near z and far z, as the four elements of perspectiveOut.  Any remaining transformations from
+// the input are returned in the residualTransform matrix, such that transformIn = projection * residualTransform.  This
+// residual comprises a model/view transform.
+//
+// Limitations: Since part of what makes up a projection matrix is scaling, it is not possible for this routine to distinguish
+// scaling that may have been applied to the model from that which was part of the original projection transform.  It will
+// therefore only return a perspective output that matches the original input when the model/view transformation does not
+// include scaling.
+//
+// At this time, shear is also not effectively isolated, and results will vary in the presence of shear in the model/view transform.
+//
 {
     bool result;
     bool invertable;
@@ -114,12 +124,10 @@
         }
     }
     else {
-    //    NSLog(@"Raw perspective: %@", NSStringFromGLKVector4(rawPerspective));
-
         //
         // Recreate the projection matrix.  This takes the output from the original unmatrix approach to isolating
         // perspective and adjusts it to a representation appropriate to Open GL and GLKit, as is produced when
-        // calling GLKMatrixMakePerspective.  For contrast, compare the CSS Transforms Level 1 draft at
+        // calling GLKMatrix4MakePerspective.  For contrast, compare the CSS Transforms Level 1 draft at
         // http://dev.w3.org/csswg/css-transforms/ .  Open GL coordinates have the positive y axis pointing up
         // and the positive z axis pointing away from the viewer, and perspective specified in terms of field of view,
         // while CSS coordinates have the positive y axis pointing down, the positive z axis pointing towards the
@@ -133,7 +141,6 @@
         q = (1 - rawPerspective.z)/(1 + rawPerspective.z);
         nearz = rawPerspective.w *(1 + q)/2.0;
         farz = nearz / q;
-        //        NSLog(@"Near z = %f, Far z = %f", nearz, farz);
         {
             GLKMatrix4 projection = GLKMatrix4Identity;
             projection.m03 = rawPerspective.x;
@@ -161,7 +168,7 @@
             // Using the transpose allows the same method to be used to factor the scale out from the left (perspective)
             // side of the transformation, rather than the right side, as for canonical model decomposition.
             //
-            [self factorTransform:GLKMatrix3Transpose(deprojected) intoScale:&scale shearRatios:&shear residualTransform:&residual];
+            [self factorTransform:GLKMatrix3Transpose(deprojected) intoResidualRotation:&residual shearRatios:&shear scale:&scale];
             //
             // Since we are extracting perspective, and not an uneven frustum, we want to factor out the shear from the
             // right (model side), so we can get the scale out for the perspective,
@@ -180,7 +187,7 @@
 //            
 //            deprojected = GLKMatrix3Multiply(deprojected, inverseShear);
 //            
-//            [self factorTransform:GLKMatrix3Transpose(deprojected) intoScale:&scale shearRatios:&shear residualTransform:&residual];
+//            [self factorTransform:GLKMatrix3Transpose(deprojected) intoResidualRotation:&residual shearRatios:&shear scale:&scale];
             //
             // Since the scale is to be applied to the prespective transform, it need to be transformed to the
             // appropriate space.
@@ -189,7 +196,7 @@
             //
 //            residual = GLKMatrix3Multiply(deprojected, GLKMatrix3Transpose(residual));
 //            scale = (GLKVector3){residual.m00, residual.m11, residual.m22};
-//            [self factorTransform:residual intoScale:&scale shearRatios:&shear residualTransform:&residual];
+//            [self factorTransform:residual intoResidualRotation:&residual shearRatios:&shear scale:&scale];
 //            scale = GLKMatrix3MultiplyVector3(GLKMatrix3Transpose(residual), scale);
             //
 */
@@ -214,18 +221,28 @@
     return true;
 }
 
-+ (bool)decomposeProjectionTransform:(GLKMatrix4)transformIn intoFrustum:(GLKVector3*)lowerBounds :(GLKVector3*)upperBounds residualTransform:(GLKMatrix4*)residualOut;
++ (bool)decomposeProjectionTransform:(GLKMatrix4)transformIn intoFrustum:(GLKVector3*)lowerBounds :(GLKVector3*)upperBounds residualTransform:(GLKMatrix4*)residualOut
+//
+// Isolates the elements that comprise a projection matrix as produced by GLKMatrix4MakeFrustum, returning those elements,
+// the left, bottom, near z, right top, and far z clip limits, in the vectors lowerBounds and UpperBounds.  Any remaining 
+// transformations from the input are returned in the residualTransform matrix, such that
+// transformIn = projection * residualTransform.  This residual comprises a model/view transform.
+//
+// Limitations: Since a projection frustum matrix imparts both scaling and shear, it is not possible for this routine to 
+// distinguish scaling or shearing that may have been applied to the model from that which was part of the original
+// projection transform.  It will therefore only return a frustum output that matches the original input when the
+// model/view transformation does not include scaling or shear.
+//
 {
     bool result;
     GLKVector4 rawPerspective;
     GLKVector3 scale, shear;
     result = [self getRawPerspective:&rawPerspective fromTransform:transformIn];
-    //    NSLog(@"Raw perspective: %@", NSStringFromGLKVector4(rawPerspective));
     
     //
     // Recreate the projection matrix.  This takes the output from the original unmatrix approach to isolating
     // perspective and adjusts it to a representation appropriate to Open GL and GLKit, as is produced when
-    // calling GLKMatrixMakePerspective.  For contrast, compare the CSS Transforms Level 1 draft at
+    // calling GLKMatrix4MakeFrustum.  For contrast, compare the CSS Transforms Level 1 draft at
     // http://dev.w3.org/csswg/css-transforms/ .  Open GL coordinates have the positive y axis pointing up
     // and the positive z axis pointing away from the viewer, and perspective specified in terms of field of view,
     // while CSS coordinates have the positive y axis pointing down, the positive z axis pointing towards the
@@ -240,7 +257,6 @@
     q = (1 - rawPerspective.z)/(1 + rawPerspective.z);
     nearz = rawPerspective.w *(1 + q)/2.0;
     farz = nearz / q;
-    //        NSLog(@"Near z = %f, Far z = %f", nearz, farz);
     {
         GLKMatrix4 projection = GLKMatrix4Identity;
         projection.m03 = rawPerspective.x;
@@ -264,7 +280,7 @@
         // Get scale and shear, to build the frustum
         //
         GLKMatrix3 residualTransform;
-        [self factorTransform:GLKMatrix3Invert(deprojected, &invertable) intoScale:&scale shearRatios:&shear residualTransform:nil];
+        [self factorTransform:GLKMatrix3Invert(deprojected, &invertable) intoResidualRotation:nil shearRatios:&shear scale:&scale];
         GLKMatrix3 inverseScaleMatrix = {scale.x, 0.0, 0.0, 0.0, scale.y, 0.0, 0.0, 0.0, scale.z};
         scale.x = 1.0/scale.x;
         scale.y = 1.0/scale.y;
@@ -273,7 +289,7 @@
         // This could be cleaner. Simplification needed.
         //
         residualTransform = GLKMatrix3Multiply(inverseScaleMatrix, deprojected);
-        [self factorTransform:GLKMatrix3Invert(residualTransform, &invertable) intoScale:nil shearRatios:&shear residualTransform:nil];
+        [self factorTransform:GLKMatrix3Invert(residualTransform, &invertable) intoResidualRotation:nil shearRatios:&shear scale:nil];
         shear.v[0] = -shear.v[0]*scale.x/scale.y;
         shear.v[2] = -shear.v[2]*scale.y/scale.z;
         shear.v[1] = -shear.v[1]*scale.x/scale.z+(shear.v[0]*shear.v[1]);
@@ -284,9 +300,6 @@
         left = xspan * (shear.v[1]-1.0)/2.0;
         top = yspan * (shear.v[2]+1.0)/2.0;
         bottom = yspan * (shear.v[2]-1.0)/2.0;
-        //        NSLog (@"Field of View: %f radians (%f degrees), aspect ratio: %f.", fieldOfView, GLKMathRadiansToDegrees(fieldOfView),aspectRatio);
-        //        NSLog (@"Frustum bounds: {{ %f, %f, %f } { %f, %f, %f }}", left, bottom, nearz, right, top, farz);
-        // NSLog (@"Intermediate transform: %@",NSStringFromGLKMatrix3(residualTransform));
     }
     if ((lowerBounds != nil) && (upperBounds != nil)) {
         lowerBounds->x = left;
@@ -298,7 +311,6 @@
     }
     if (residualOut != nil) {
         projection = GLKMatrix4MakeFrustum (left, right, bottom, top, nearz, farz);
-        // NSLog (@"Frustum transform: %@",NSStringFromGLKMatrix4(projection));
         GLKMatrix4 inverseProjection = GLKMatrix4Invert(projection, &invertable);
         if (!invertable) {
             return false;
@@ -308,8 +320,23 @@
     return true;
 }
 
-+ (void)factorTransform:(GLKMatrix3)transformIn intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut residualTransform:(GLKMatrix3*)residualOut;
++ (void)factorTransform:(GLKMatrix3)transformIn intoResidualRotation:(GLKMatrix3*)residualOut shearRatios:(GLKVector3*)shearRatiosOut  scale:(GLKVector3*)scaleOut
 {
+//
+// Factor a linear transform into the component transforms shear and scale, leaving a residual transform representing
+// a rotation.  The input transformIn is 3x3, with no homogenoous coordinates, and therefore does not represent
+// translation or perspective.
+//
+// This routine factors the input transform such that transform = rotation * shear * scale, with shearRatiosOut being
+// a three component vector representing XY, XZ, and YZ shears only, since adding the YX, ZX, and ZY shears would
+// create ambiguity with the specification of rotation.
+//
+// Since matrix multiplication is not commutative, factoring a transform that is composed in a different order, such as
+// rotation * scale * shear, will not produce results matching the original components. However, this routine can assist
+// in factoring in an alternative order when the input matrix is appropriately modified, and is used in ths way when
+// decomposing a frustum.
+//
+    
  	/* Now get scale and shear. */
     register int i;
     GLKVector3 scale, shearRatios;
@@ -344,32 +371,18 @@
  	shearRatios.v[1] /= scale.z;
  	shearRatios.v[2] /= scale.z;
     
-    // Now remove the shear and get the unsheared scale factors
-//    
-//    GLKMatrix3 inverseShear = GLKMatrix3Identity;
-//    inverseShear.m10 = -shearRatios.v[0];
-//    inverseShear.m21 = -shearRatios.v[2];
-//    inverseShear.m20 = -shearRatios.v[1] + (shearRatios.v[0] * shearRatios.v[2]);
-//    
-//    transformIn = GLKMatrix3Multiply(inverseShear, transformIn);
-//    
-//    for ( i=0; i<3; i++ ) {
-//        column[i] = GLKMatrix3GetRow(transformIn, i);
-// 	}
-// 	scale.x = GLKVector3Length(column[0]);
-// 	column[0] = GLKVector3DivideScalar(column[0], scale.x);
-// 	scale.y = GLKVector3Length(column[1]);
-// 	column[1] = GLKVector3DivideScalar(column[1], scale.y);
-// 	scale.z = GLKVector3Length(column[2]);
-// 	column[2] = GLKVector3DivideScalar(column[2], scale.z);
-//
-    
     if (scaleOut != nil) *scaleOut = scale;
     if (shearRatiosOut != nil) *shearRatiosOut = shearRatios;
     if (residualOut != nil) *residualOut = GLKMatrix3MakeWithColumns(column[0], column[1], column[2]);
 }
 
-+ (bool)decomposeModelViewTransform:(GLKMatrix4)transformIn intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut translation:(GLKVector3*)translationOut
++ (bool)decomposeModelViewTransform:(GLKMatrix4)transformIn intoTranslation:(GLKVector3*)translationOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut shearRatios:(GLKVector3*)shearRatiosOut scale:(GLKVector3*)scaleOut
+//
+// Decompose a model/view transformation matrix into component transformations such that transformation = translation *
+// rotation * shear * scale.  Rotation can be retrieved as either a three component vector of Euler angles, or as a
+// quaternion.  The quaternion output is prefered as it does not introduce problems with gimbal lock, and can easily be
+// converted to axis / angle for if desired.
+//
 {
     register int i;
  	GLKVector3 column[3];
@@ -381,7 +394,7 @@
     
     GLKMatrix3 transform3In = GLKMatrix4GetMatrix3(transformIn);
  	/* Now get scale and shear. */
-    [self factorTransform:transform3In intoScale:scaleOut shearRatios:shearRatiosOut residualTransform:&transform3In];
+    [self factorTransform:transform3In intoResidualRotation:&transform3In shearRatios:shearRatiosOut scale:scaleOut];
     
     for ( i=0; i<3; i++ ) {
         column[i] = GLKMatrix3GetColumn(transform3In, i);
@@ -429,7 +442,19 @@
     return true;
 }
 
-+ (bool)decomposeTransform:(GLKMatrix4)transformIn intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut translation:(GLKVector3*)translationOut perspective:(GLKVector4*)perspectiveOut;
++ (bool)decomposeTransform:(GLKMatrix4)transformIn perspective:(GLKVector4*)perspectiveOut translation:(GLKVector3*)translationOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut shearRatios:(GLKVector3*)shearRatiosOut scale:(GLKVector3*)scaleOut
+//
+// Decompose a combined model/view/projection transformation matrix into components such that transformation = projection *
+// translation * rotation * shear * scale.  This routine returns the projection component as a vector of four values
+// representing field of view, aspect ratio, near z and far z, which are the inputs for GLKMatrix4MakePerspective. Rotation
+// can be retrieved as either a three component vector of Euler angles, or as a quaternion. The quaternion output is
+// prefered as it does not introduce problems with gimbal lock, and can easily be converted to axis / angle form if desired.
+//
+// Note that if a projection element of the transformation is found, any scale factors from the input may be incorporated
+// in the perspective calculation, and the scale element may be empty, even when scaling as part of the original model/view
+// portion of the input transform.  A further limitation at present is that any shear present in the transform can interfere
+// with returning results that match to original composition of component transforms when a projection is present.
+//
 {
     GLKVector4 perspective;
  	bool result;
@@ -438,12 +463,23 @@
     
     if (result) {
         if (perspectiveOut != nil) *perspectiveOut = perspective;    
-        result = [self decomposeModelViewTransform:transformIn intoScale:scaleOut shearRatios:shearRatiosOut rotation:rotationOut quaternion:quaternionOut translation:translationOut];
+        result = [self decomposeModelViewTransform:transformIn intoTranslation:translationOut rotation:rotationOut quaternion:quaternionOut shearRatios:shearRatiosOut scale:scaleOut];
     }
  	return result;
 }
 
-+ (bool)decomposeTransform:(GLKMatrix4)transformIn intoScale:(GLKVector3*)scaleOut shearRatios:(GLKVector3*)shearRatiosOut rotation:(GLKVector3*)rotationOut quaternion: (GLKQuaternion*)quaternionOut translation:(GLKVector3*)translationOut frustum:(GLKVector3*)lowerBoundsOut :(GLKVector3*)upperBoundsOut;
++ (bool)decomposeTransform:(GLKMatrix4)transformIn frustum:(GLKVector3*)lowerBoundsOut :(GLKVector3*)upperBoundsOut translation:(GLKVector3*)translationOut rotation:(GLKVector3*)rotationOut quaternion:(GLKQuaternion*)quaternionOut shearRatios:(GLKVector3*)shearRatiosOut scale:(GLKVector3*)scaleOut
+//
+// Decompose a combined model/view/projection transformation matrix into components such that transformation = projection *
+// translation * rotation * shear * scale.  This routine returns the projection component as two vectors of three values
+// each, representing the lower and upper bounds of a frustum, which are the inputs for GLKMatrix4MakeFrustum. Rotation
+// can be retrieved as either a three component vector of Euler angles, or as a quaternion. The quaternion output is
+// prefered as it does not introduce problems with gimbal lock, and can easily be converted to axis / angle form if desired.
+//
+// Note that if a projection element of the transformation is found, any scale and shear factors from the input may be 
+// incorporated in the frustum calculation, and the scale and shear elements may be empty, even when scaling or shearing
+// are part of the original model/view portion of the input transform.
+//
 {
     GLKVector3 lowerBounds, upperBounds;
  	bool result;
@@ -455,7 +491,7 @@
             *lowerBoundsOut = lowerBounds;
             *upperBoundsOut = upperBounds;
         }
-        result = [self decomposeModelViewTransform:transformIn intoScale:scaleOut shearRatios:shearRatiosOut rotation:rotationOut quaternion:quaternionOut translation:translationOut];
+        result = [self decomposeModelViewTransform:transformIn intoTranslation:translationOut rotation:rotationOut quaternion:quaternionOut shearRatios:shearRatiosOut scale:scaleOut];
     }
  	return result;
 }
