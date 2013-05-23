@@ -1,12 +1,12 @@
 TransformUtilities
 ==================
 
-**TransformUtilities** is an Objective C class built on Apple's GLKit to facilitate breaking a 3D transformation matrix into a series of simple component transformations.  It is packaged as a class, rather than functions, to allow future configuration of matrix decomposition behavior.
+**TransformUtilities** is an Objective C class built on Apple's GLKit to facilitate breaking a 3D transformation matrix into a series of simple component transformations.  It is packaged as a class, rather than functions, to allow future configuration of matrix decomposition behavior.  Several routines (class methods) are provided factoring mdel/view, projection, and combined transformation matrices.
 
 Background
 ----------
 
-Transformation matrices used in 3D rendering are generally created by combinig a series of basic transformations, falling into the categories of *translation, rotation, scaling, shear* and *perspective*.  These may be combined in any sequence, and since matrix multiplication (composition) is not commutative, it is not generally possible to fully reconstruct the original series of operations that went in to creating a given transformation.
+Transformation matrices used in 3D rendering are generally created by combinig a series of basic transformations, falling into the categories of *projection, translation, rotation, shear* and *scaling*.  These may be combined in any sequence, and since matrix multiplication (composition) is not commutative, it is not generally possible to fully reconstruct the original series of operations that went in to creating a given transformation.
 
 It is, however, possible to generate a canonical sequence of basic transformations that will reproduce a given transformation when recombined.  Furthermore, by incorporating certain assumptions, it is possible to create such a series of transformations that reflects standard usage of available APIs, and which may therefore match or come close to the original sequence of transformations.
 
