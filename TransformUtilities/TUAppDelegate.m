@@ -34,6 +34,10 @@
 
 @implementation TUAppDelegate
 
+//
+// Generic Apple app delegate template.
+//
+
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
     // Override point for customization after application launch.

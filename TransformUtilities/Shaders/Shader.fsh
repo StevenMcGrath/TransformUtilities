@@ -29,6 +29,9 @@
     THE SOFTWARE.
 */
 
+//
+// Generic basic shader from Apple template.
+//
 
 varying lowp vec4 colorVarying;
 

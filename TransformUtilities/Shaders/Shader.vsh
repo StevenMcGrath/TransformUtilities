@@ -29,6 +29,10 @@
     THE SOFTWARE.
 */
 
+//
+// Generic basic shader from Apple template.
+//
+
 attribute vec4 position;
 attribute vec3 normal;
 
