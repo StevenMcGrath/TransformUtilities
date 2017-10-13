@@ -1,7 +1,7 @@
 TransformUtilities
 ==================
 
-**TransformUtilities** is an Objective C class built on Apple's GLKit to facilitate breaking a 3D transformation matrix into a series of simple component transformations.  It is packaged as a class, rather than functions, to allow future configuration of matrix decomposition behavior.  Several routines (class methods) are provided factoring mdel/view, projection, and combined transformation matrices.
+**TransformUtilities** is an Objective C class built on Apple's GLKit to facilitate breaking a 3D transformation matrix into a series of simple component transformations.  It is packaged as a class, rather than functions, to allow future configuration of matrix decomposition behavior.  Several routines (class methods) are provided factoring model/view, projection, and combined transformation matrices.
 
 Background
 ----------
